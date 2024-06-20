@@ -100,9 +100,9 @@ def log_cosh_dice_loss(y_true, y_pred, axis=(0, 1, 2, 3)):
 
     Args:
         y_true: Ground truth values for all classes.
-                 shape: (batch_size, x_dim, y_dim, z_dim, num_classes)
+                 shape: (x_dim, y_dim, z_dim, num_classes)
         y_pred: Predictions for all classes.
-                 shape: (batch_size, x_dim, y_dim, z_dim, num_classes)
+                 shape: (x_dim, y_dim, z_dim, num_classes)
         axis (tuple): Spatial axes to sum over when computing numerator and
                       denominator in formula for dice loss.
     Returns:
