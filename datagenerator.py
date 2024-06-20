@@ -5,10 +5,10 @@ import nibabel as nib
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
+
 class DataGenerator(tensorflow.keras.utils.Sequence):
-    # Initialize the generator with default batch size of 1
     def __init__(self, mri_paths, mask_paths, mri_width, mri_height, mri_depth, batch_size=1, shuffle=True,
-                 num_channels=1, augment=False, standardization=True, num_classes=3, weighted_classes=True,
+                 num_channels=3, augment=False, standardization=True, num_classes=3, weighted_classes=True,
                  sample_weights=None, **kwargs):
         super().__init__(**kwargs)
         self.mri_paths = mri_paths
@@ -135,45 +135,54 @@ class DataGenerator(tensorflow.keras.utils.Sequence):
         #  Casting masks as np.int types yields the following exception by Tensorflow so the masks are casted
         #   to np.float32 instead:
         #       TypeError: Input 'y' of 'Mul' Op has type float32 that does not match type int32 of argument 'x'
-      
-
-        if self.num_channels > 1: mris = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, self.num_channels), dtype=np.float32)
+        if self.num_channels > 1:
+            mris = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, self.num_channels), dtype=np.float32)
         else:
-        # There has to be an extra channel dimension of one specified even for single channel mri files for
-        # input to a 3D convolutional Tensorflow model
-             mris = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, 1), dtype=np.float32)
+            # There has to be an extra channel dimension of one specified even for single channel mri files for
+            # input to a 3D convolutional Tensorflow model
+            mris = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, 1), dtype=np.float32)
 
         if self.num_classes > 2:  # Multiclass segmentation
-                                 masks = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, self.num_classes),  dtype=np.float32)
+            masks = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, self.num_classes),  dtype=np.float32)
         else:  # Binary segmentation
-             masks = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, 1),  dtype=np.float32)
+            masks = np.empty((self.batch_size, self.mri_height, self.mri_width, self.mri_depth, 1),  dtype=np.float32)
 
         for i, (mri_path, mask_path) in enumerate(zip(mri_paths, mask_paths)):
-                     mri = nib.load(mri_path).get_fdata()
-                     mask = nib.load(mask_path).get_fdata()
-                     
-        if self.num_channels == 1:
-              mri = mri.reshape(mri.shape[0], mri.shape[1], mri.shape[2], 1)
+            try:
+                mri = nib.load(mri_path).get_fdata()
+                mask = nib.load(mask_path).get_fdata()
+            except Exception as e:
+                print(f"Error loading MRI or mask file: {e}")
+                continue
 
-        # Multiclass segmentation -> use tensorflow.keras.utils.to_categotical()
-        if self.num_classes > 2:
-            mask = to_categorical(mask, num_classes=self.num_classes)
-        # Binary segmentation -> reshape to an additional 'channel' dimension of 1 for training a 3D Convolutional
-        #  Tensorflow model
-        else:
-            mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1)
+            # Debug: Print the shape of the loaded MRI
+            print(f"Loaded MRI shape: {mri.shape}")
+            print(f"Expected shape: {(self.mri_height, self.mri_width, self.mri_depth, self.num_channels)}")
 
-        # Have the same augmentation transformation operations for the MRI nifti array and its corresponding mask
-        if self.augment:
-            transformed = self.transform(image=mri, mask=mask)
-            mri = transformed["image"]
-            mask = transformed["mask"]
+            # For single channel MRI it has to be resized to an additional channel dimension of 1 for purposes of
+            #  training with a 3D Convolutional Tensorflow model
+            if self.num_channels == 1:
+                mri = mri.reshape(mri.shape[0], mri.shape[1], mri.shape[2], 1)
 
-        # Standardize each mri slice along the depth axis in each channel to mean 0 and standard deviation 1
-        if self.standardization:
-            mri = self.standardize(mri=mri)
+            # Multiclass segmentation -> use tensorflow.keras.utils.to_categorical()
+            if self.num_classes > 2:
+                mask = to_categorical(mask, num_classes=self.num_classes)
+            # Binary segmentation -> reshape to an additional 'channel' dimension of 1 for training a 3D Convolutional
+            #  Tensorflow model
+            else:
+                mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1)
 
-        mris[i, ] = mri.astype(np.float32)
-        masks[i, ] = mask.astype(np.float32)
+            # Have the same augmentation transformation operations for the MRI nifti array and its corresponding mask
+            if self.augment:
+                transformed = self.transform(image=mri, mask=mask)
+                mri = transformed["image"]
+                mask = transformed["mask"]
+
+            # Standardize each mri slice along the depth axis in each channel to mean 0 and standard deviation 1
+            if self.standardization:
+                mri = self.standardize(mri=mri)
+
+            mris[i, ] = mri.astype(np.float32)
+            masks[i, ] = mask.astype(np.float32)
 
         return mris, masks  # Returns numpy arrays
