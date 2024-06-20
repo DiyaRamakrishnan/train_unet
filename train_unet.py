@@ -30,22 +30,8 @@ from tensorflow.keras.layers import (
     concatenate
 )
 
-def unet_3d_upsampling_dropout(input_size=(240, 240, 160, 1), unet_resize_factor=2, unet_dropout_rate=0.3, num_classes=3,
-                               binary_model=False):
-    """Constructs a U-Net 3D segmentation model with Dropout layers and UpSampling3D -> Conv3D layers.
-
-    Args:
-        input_size: (tuple) Keras model input shape is  (batch_size, height, width, length, channels) with
-                    'channels_last', (default: (240, 240, 160, 4)). Note: depth must be a multiple of 16.
-                    Source: 'data_format' parameter documentation: https://keras.io/api/layers/convolution_layers/convolution3d/
-        unet_resize_factor: (int) Resize factor of the number of filters (channels) per Convolutional layer in the U-Net
-                             model (must be >= 1, such that 1 means retaining the original number of filters (channels)
-                             per Convolutional layer in the U-Net model) (default: 2 (half-size))
-        unet_dropout_rate: (float) Dropout rate for the Dropout layers in the U-Net model (default: 0.3).
-        num_classes: (int) Number of classes in the training dataset (default: 4).
-        binary_model: (boolean) If True, make the last layer have one filter with 'sigmoid' activation for a 3D binary
-                        segmentation model.
-    """
+def unet_3d_upsampling_dropout(input_size=(240, 240, 160, 4), unet_resize_factor=2, unet_dropout_rate=0.3, num_classes=3, binary_model=False):
+    """Constructs a U-Net 3D segmentation model with Dropout layers and UpSampling3D -> Conv3D layers."""
     inputs = Input(shape=input_size)
 
     # Contractive path
@@ -106,29 +92,28 @@ def unet_3d_upsampling_dropout(input_size=(240, 240, 160, 1), unet_resize_factor
 parser = argparse.ArgumentParser(description="Training U-Net 3D image segmentation model.")
 parser.add_argument('--train_data_dir', type=str, required=True, help="(Required) Path to the train dataset folder")
 parser.add_argument('--val_data_dir', type=str, required=True, help="(Required) Path to the val dataset folder")
-parser.add_argument('--model_architecture', default="conv3dtranspose_batchnormalization", type=str, choices=["upsampling_dropout", "conv3dtranspose_dropout", "upsampling_batchnormalization", "conv3dtranspose_batchnormalization"], help="Which model architecture to build the binary 3D U-Net segmentation with: ('upsampling_dropout','conv3dtranspose_dropout','upsampling_batchnormalization','conv3dtranspose_batchnormalization'), default: 'conv3dtranspose_batchnormalization'")
-parser.add_argument('--unet_resize_factor', default=2, type=int, help="(integer value) Resize factor of the number of filters (channels) per Convolutional layer in the U-Net model (must be >= 1, such that 1 means retaining the original number of filters (channels) per Convolutional layer in the U-Net model) (default: 2 (half the original size))")
-parser.add_argument('--unet_dropout_rate', default=0.3, type=float, help="Dropout rate for the Dropout layers in the U-Net model, must be < 1 and > 0 (default: 0.3)")
-parser.add_argument('--num_classes', type=int, required=True, help="(Required) Number of classes in dataset: (Task01_BrainTumour: 4, Task02_Heart: 2, Task03_Liver: 3, Task04_Hippocampus: 3, Task05_Prostate: 3, Task06_Lung: 2, Task07_Pancreas: 3, Task08_HepaticVessel: 3, Task09_Spleen: 2, Task10_Colon: 2)")
-parser.add_argument('--num_channels', type=int, required=True, help="(Required) Number of channels in image mri file in dataset (modality): (Task01_BrainTumour: 4, Task02_Heart: 1, Task03_Liver: 1, Task04_Hippocampus: 1, Task05_Prostate: 2, Task06_Lung: 1, Task07_Pancreas: 1, Task08_HepaticVessel: 1, Task09_Spleen: 1, Task10_Colon: 1)")
-parser.add_argument('--weighted_classes', default=True, type=bool, help="If set to True, train model with sample weighting; the sample weights per class would be calculated from the training set by the Data Generator (default: True)")
-parser.add_argument('--train_multi_gpu', default=False, type=bool, help="If set to True, train model with multiple GPUs. (default: False)")
-parser.add_argument('--num_gpus', default=1, type=int, help="Set number of available GPUs for multi-gpu training, '--train_multi_gpu' must be also set to True  (default: 1)")
-parser.add_argument('--training_epochs', default=250, type=int, help="Required training epochs (default: 250)")
-parser.add_argument('--model_path', default="unet_3d_segmentation_model.keras",  type=str, help='Path to model checkpoint (default: "unet_3d_segmentation_model.keras")')
-parser.add_argument('--resume_train', default=False, type=bool, help="If set to True, resume model training from model_path (default: False)")
-parser.add_argument('--loss', type=str, default="log_dice", choices=["dice", "log_dice"], help="Required segmentation loss function for training the multiclass segmentation model: ('dice','log_dice'), (default: 'log_dice')")
-parser.add_argument('--optimizer', type=str, default="adam", choices=["sgd", "adam", "nadam"], help="Required optimizer for training the model: ('sgd','adam','nadam'), (default: 'adam')")
-parser.add_argument('--lr', default=0.0001, type=float, help="Learning rate for the optimizer (default: 0.0001)")
-parser.add_argument('--use_nesterov_sgd', default=False, type=bool, help="Use Nesterov momentum with SGD optimizer: ('True', 'False') (default: False)")
-parser.add_argument('--use_amsgrad_adam', default=False, type=bool, help="Use AMSGrad with adam optimizer: ('True', 'False') (default: False)")
-parser.add_argument('--train_batch_size', default=1, type=int, help="Batch size for train dataset datagenerator, if --train_multi_gpu then the minimum value must be the number of GPUs (default: 1)")
-parser.add_argument('--val_batch_size', default=1, type=int, help="Batch size for validation dataset datagenerator, if --train_multi_gpu then the minimum value must be the number of GPUs  (default: 1)")
-parser.add_argument('--mri_width', default=240, type=int, help="Input mri slice width (default: 240)")
-parser.add_argument('--mri_height', default=240, type=int, help="Input mri slice height (default: 240)")
-parser.add_argument('--mri_depth', default=160, type=int, help="Input mri depth, must be a multiple of 16 for the 3D U-Net model (default: 160)")
-parser.add_argument('--num_workers', default=4, type=int, help="Number of workers for fit_generator (default: 4)")
-
+parser.add_argument('--model_architecture', default="conv3dtranspose_batchnormalization", type=str, choices=["upsampling_dropout", "conv3dtranspose_dropout", "upsampling_batchnormalization", "conv3dtranspose_batchnormalization"], help="Which model architecture to build the binary 3D U-Net segmentation with")
+parser.add_argument('--unet_resize_factor', default=2, type=int, help="Resize factor of the number of filters (channels) per Convolutional layer in the U-Net model")
+parser.add_argument('--unet_dropout_rate', default=0.3, type=float, help="Dropout rate for the Dropout layers in the U-Net model")
+parser.add_argument('--num_classes', type=int, required=True, help="Number of classes in dataset")
+parser.add_argument('--num_channels', type=int, required=True, help="Number of channels in image mri file in dataset")
+parser.add_argument('--weighted_classes', default=True, type=bool, help="If set to True, train model with sample weighting")
+parser.add_argument('--train_multi_gpu', default=False, type=bool, help="If set to True, train model with multiple GPUs")
+parser.add_argument('--num_gpus', default=1, type=int, help="Set number of available GPUs for multi-gpu training")
+parser.add_argument('--training_epochs', default=250, type=int, help="Required training epochs")
+parser.add_argument('--model_path', default="unet_3d_segmentation_model.keras",  type=str, help='Path to model checkpoint')
+parser.add_argument('--resume_train', default=False, type=bool, help="If set to True, resume model training from model_path")
+parser.add_argument('--loss', type=str, default="log_dice", choices=["dice", "log_dice"], help="Required segmentation loss function for training the multiclass segmentation model")
+parser.add_argument('--optimizer', type=str, default="adam", choices=["sgd", "adam", "nadam"], help="Required optimizer for training the model")
+parser.add_argument('--lr', default=0.0001, type=float, help="Learning rate for the optimizer")
+parser.add_argument('--use_nesterov_sgd', default=False, type=bool, help="Use Nesterov momentum with SGD optimizer")
+parser.add_argument('--use_amsgrad_adam', default=False, type=bool, help="Use AMSGrad with adam optimizer")
+parser.add_argument('--train_batch_size', default=1, type=int, help="Batch size for train dataset datagenerator")
+parser.add_argument('--val_batch_size', default=1, type=int, help="Batch size for validation dataset datagenerator")
+parser.add_argument('--mri_width', default=240, type=int, help="Input mri slice width")
+parser.add_argument('--mri_height', default=240, type=int, help="Input mri slice height")
+parser.add_argument('--mri_depth', default=160, type=int, help="Input mri depth, must be a multiple of 16 for the 3D U-Net model")
+parser.add_argument('--num_workers', default=4, type=int, help="Number of workers for fit_generator")
 args = parser.parse_args()
 
 def set_tensorflow_mirrored_strategy_gpu_devices_list(num_gpus):
@@ -500,6 +485,7 @@ def main():
         validation_data=val_datagenerator,
         verbose=1,
         callbacks=[reducelronplateau, checkpoint],
+        workers=num_workers
     )
 
     # Modified to fix the 'np.float32 is not JSON serializable issue'
