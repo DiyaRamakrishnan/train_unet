@@ -1,11 +1,3 @@
-"""This module was originally imported from the reference implementation in the Week 3 of Course 1 project in the
-AI for Medicine Specialization course on Coursera.
-
-The binary segmentation losses and metric were imported from shruti-jadon's 'Semantic-Segmentation-Loss-Functions'
- GitHub repository for binary segmentation training mode:
- https://github.com/shruti-jadon/Semantic-Segmentation-Loss-Functions/blob/master/loss_functions.py
-"""
-
 import tensorflow.keras.backend as K
 import tensorflow as tf
 
@@ -100,9 +92,9 @@ def log_cosh_dice_loss(y_true, y_pred, axis=(0, 1, 2, 3)):
 
     Args:
         y_true: Ground truth values for all classes.
-                 shape: (x_dim, y_dim, z_dim, num_classes)
+                 shape: (batch_size, x_dim, y_dim, z_dim, num_classes)
         y_pred: Predictions for all classes.
-                 shape: (x_dim, y_dim, z_dim, num_classes)
+                 shape: (batch_size, x_dim, y_dim, z_dim, num_classes)
         axis (tuple): Spatial axes to sum over when computing numerator and
                       denominator in formula for dice loss.
     Returns:
