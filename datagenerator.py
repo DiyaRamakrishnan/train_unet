@@ -156,9 +156,6 @@ class DataGenerator(tensorflow.keras.utils.Sequence):
                 continue
 
             # Debug: Print the shape of the loaded MRI
-            print(f"Loaded MRI shape: {mri.shape}")
-            print(f"Expected shape: {(self.mri_height, self.mri_width, self.mri_depth, self.num_channels)}")
-
             # For single channel MRI it has to be resized to an additional channel dimension of 1 for purposes of
             #  training with a 3D Convolutional Tensorflow model
             if self.num_channels == 1:
